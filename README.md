@@ -1,6 +1,5 @@
-# HighLevel SDE-2 Take-home: Unified Conversations Inbox
-
-Fastify + TypeScript + Prisma + PostgreSQL implementation. This is a take-home scaffold and should be verified locally against a real PostgreSQL/Supabase instance before submission.
+# Unified-Conversations-Inbox
+Businesses talk to their customers across SMS, Email and WhatsApp. Agents want one inbox where every message from a contact, across every channel, appears in a single conversation thread, in realtime.
 
 ## Prerequisites
 - Node.js 20 or later, npm
