@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Channel {
+  sms
+  whatsapp
+  email
+}
+
+enum Direction {
+  inbound
+  outbound
+}
+
+enum MessageStatus {
+  queued
+  sent
+  delivered
+  read
+  failed
+}
+
+enum ConversationStatus {
+  open
+  closed
+}
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model Contact {
+  id              String         @id @default(uuid())
+  locationId      String
+  phoneNormalized String?
+  emailNormalized String?
+  displayName     String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  conversations   Conversation[]
+
+  @@unique([locationId, phoneNormalized])
+  @@unique([locationId, emailNormalized])
+  @@index([locationId, createdAt])
+}
+
+model Conversation {
+  id                 String             @id @default(uuid())
+  locationId         String
+  contactId          String
+  status             ConversationStatus @default(open)
+  assignedTo         String?
+  unreadCount        Int                @default(0)
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  contact            Contact            @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages           Message[]
+  jobs               OutboundJob[]
+
+  @@unique([locationId, contactId])
+  @@index([locationId, status, lastMessageAt, id])
+  @@index([locationId, assignedTo, lastMessageAt, id])
+}
+
+model Message {
+  id                String               @id @default(uuid())
+  locationId        String
+  conversationId    String
+  providerMessageId String?              @unique
+  channel           Channel
+  direction         Direction
+  body              String
+  status            MessageStatus        @default(queued)
+  sentAt            DateTime
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  conversation      Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  statusEvents      MessageStatusEvent[]
+  job               OutboundJob?
+
+  @@index([locationId, createdAt])
+  @@index([conversationId, sentAt, id])
+}
+
+model MessageStatusEvent {
+  id                String        @id @default(uuid())
+  providerMessageId String
+  status            MessageStatus
+  eventTimestamp    DateTime
+  receivedAt        DateTime      @default(now())
+  applied           Boolean       @default(false)
+  messageId         String?
+  message           Message?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([providerMessageId, eventTimestamp])
+  @@index([applied, receivedAt])
+}
+
+model OutboundJob {
+  id             String       @id @default(uuid())
+  messageId      String       @unique
+  conversationId String
+  status         JobStatus    @default(pending)
+  attempts       Int          @default(0)
+  nextAttemptAt  DateTime     @default(now())
+  lockedAt       DateTime?
+  lastError      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  message        Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+}
+
+model OutboxEvent {
+  id          String    @id @default(uuid())
+  locationId  String
+  eventType   String
+  payload     Json
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([publishedAt, createdAt])
+}
